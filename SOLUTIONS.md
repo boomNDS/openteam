@@ -10,10 +10,10 @@ if not match reset to 1 and store it in a list(string)
 
 ### Task 02 – Fix‑the‑Bug (thread safety)
 - Language: Python
-- Approach: [EXPLAIN THE FIX]
-- Why: [WHY THIS SOLUTION]
-- Time spent: ~8 min
-- **AI tools used:** [ZedAI](https://github.com/ZedAI) for autocompletion
+- Approach: Find a solution form python doc and guide that use lock to ensure thread safety and how to use in module-level style
+- Why: because on testing it call thread workers without some global variables that can be accessed by multiple threads simultaneously, leading to race conditions and incorrect results. found a doc how to handle it using lock
+- Time spent: ~20 min
+- **AI tools used:** [ZedAI](https://github.com/ZedAI) for autocompletion and ChatGPT (only focus on write a problem and let's it guide me to solve it)
 
 ### Task 03 – Sync Aggregator (concurrency & I/O)
 - Language: Python
