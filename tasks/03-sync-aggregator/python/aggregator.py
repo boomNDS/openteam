@@ -7,8 +7,22 @@ Candidates should:
   • preserve input order,
   • return the list of dicts exactly as the spec describes.
 """
-from __future__ import annotations
+from __future__ import annotations, print_function
 from typing import List, Dict
+
+import pathlib, time
+_DATA_DIR = pathlib.Path(__file__).parent.parent / "data"
+_FILELIST = _DATA_DIR / "filelist.txt"
+
+
+def process_file(path: str) -> Dict:
+    try:
+        curr_file = pathlib.Path(path).read_text()
+        lines = curr_file.splitlines()
+        words = sum(len(line.strip().split()) for line in lines)
+        return {"path": path, "lines": len(lines), "words": words, "status": "ok"}
+    except TimeoutError:
+        return {"path": path, "status": "timeout"}
 
 
 def aggregate(filelist_path: str, workers: int = 4, timeout: int = 2) -> List[Dict]:
@@ -31,6 +45,13 @@ def aggregate(filelist_path: str, workers: int = 4, timeout: int = 2) -> List[Di
     timeout : int
         Per‑file timeout budget in **seconds**.
     """
-    # ── TODO: IMPLEMENT ──────────────────────────────────────────────────────────
-    raise NotImplementedError("implement aggregate()")
-    # ─────────────────────────────────────────────────────────────────────────────
+    print("Starting aggregation...")
+    filelist = open(filelist_path).read().splitlines()
+    base_dir = pathlib.Path(filelist_path).parent
+
+    for rel_path in filelist:
+        full_path = (base_dir / rel_path).resolve()
+        result = process_file(str(full_path))
+        print(result)
+
+aggregate(str(_FILELIST), workers=8, timeout=2)
