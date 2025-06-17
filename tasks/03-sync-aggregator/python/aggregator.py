@@ -9,21 +9,22 @@ Candidates should:
 """
 from __future__ import annotations, print_function
 from typing import List, Dict
-
-import pathlib, time
-_DATA_DIR = pathlib.Path(__file__).parent.parent / "data"
-_FILELIST = _DATA_DIR / "filelist.txt"
-
+import pathlib
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeout
+import time
 
 def process_file(path: str) -> Dict:
-    try:
-        curr_file = pathlib.Path(path).read_text()
-        lines = curr_file.splitlines()
-        words = sum(len(line.strip().split()) for line in lines)
-        return {"path": path, "lines": len(lines), "words": words, "status": "ok"}
-    except TimeoutError:
-        return {"path": path, "status": "timeout"}
+    curr_file = open(path).read()
+    lines = curr_file.splitlines()
+    if lines and lines[0].strip().startswith("#sleep="):
+        seconds = float(lines[0].strip().split("=", 1)[1])
+        print(f"[INFO] Sleeping {seconds}s for {path}")
+        time.sleep(seconds)
+        lines = lines[1:]
 
+    words = sum(len(line.split()) for line in lines)
+    return {"path": str(pathlib.Path(pathlib.Path(path).parent.name) / pathlib.Path(path).name),
+            "lines": len(lines), "words": words, "status": "ok"}
 
 def aggregate(filelist_path: str, workers: int = 4, timeout: int = 2) -> List[Dict]:
     """
@@ -45,13 +46,27 @@ def aggregate(filelist_path: str, workers: int = 4, timeout: int = 2) -> List[Di
     timeout : int
         Per‑file timeout budget in **seconds**.
     """
-    print("Starting aggregation...")
     filelist = open(filelist_path).read().splitlines()
     base_dir = pathlib.Path(filelist_path).parent
+    results = [{} for _ in range(len(filelist))]
 
-    for rel_path in filelist:
-        full_path = (base_dir / rel_path).resolve()
-        result = process_file(str(full_path))
-        print(result)
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_map = {}
+        for i, rel_path in enumerate(filelist):
+            full_path = (base_dir / rel_path).resolve()
+            result = executor.submit(process_file, str(full_path))
+            future_map[result] = i
+        for i in future_map:
+                idx = future_map[i]
+                try:
+                    result = i.result(timeout=timeout)
+                except FuturesTimeout:
+                    result = {"path": filelist[idx], "status": "timeout"}
+                results[idx] = result
+    sort_results = sorted(
+        results,
+        key=lambda x: (pathlib.Path(x["path"]).name)
+    )
+    print(sort_results)
 
-aggregate(str(_FILELIST), workers=8, timeout=2)
+    return sort_results
