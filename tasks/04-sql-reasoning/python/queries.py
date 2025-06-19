@@ -14,27 +14,60 @@ FROM
 	pledge AS p
 	LEFT JOIN campaign AS c ON p.campaign_id = c.id
 GROUP BY
-	p.campaign_id;
+	p.campaign_id
+ORDER BY
+	pct_of_target DESC,
+	campaign_id ASC;
 """
 
 # --- Task B ---------------------------------------------------------------
 SQL_B = """
+WITH
+	all_pledges AS (
+		SELECT
+			'global' AS scope,
+			amount_thb
+		FROM
+			pledge
+		UNION ALL
+		SELECT
+			'thailand' AS scope,
+			p.amount_thb
+		FROM
+			pledge p
+			JOIN donor d ON p.donor_id = d.id
+		WHERE
+			d.country = 'Thailand'
+	),
+	ranked AS (
+		SELECT
+			scope,
+			amount_thb,
+			ROW_NUMBER() OVER (
+				PARTITION BY
+					scope
+				ORDER BY
+					amount_thb
+			) AS rankNumber,
+			COUNT(*) OVER (
+				PARTITION BY
+					scope
+			) AS cnt
+		FROM
+			all_pledges
+	)
 SELECT
-	(ceil(0.9 * SUM(p.amount_thb))) AS p90_thb,
-	CASE
-		WHEN d.country = 'Thailand' THEN 'thailand'
-		ELSE 'global'
-	END AS country
+	scope,
+	amount_thb AS p90_thb
 FROM
-	pledge p
-	LEFT JOIN donor d ON p.donor_id = d.id
-GROUP BY
-	CASE
-		WHEN d.country = 'Thailand' THEN 'thailand'
-		ELSE 'global'
-	END
+	ranked
+WHERE
+	rankNumber = CEIL(0.9 * cnt)
 ORDER BY
-	p90_thb;
+	CASE scope
+		WHEN 'global' THEN 1
+		ELSE 2
+	END;
 """
 
 # --- (skipped) indexes -----------------------------------------------------
